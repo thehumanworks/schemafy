@@ -135,9 +135,14 @@ pub fn build_root_schema(name: &str, fields: &[Field]) -> Value {
     object_schema(fields, Some(name))
 }
 
-pub fn render_schema(schema: &Value) -> Result<String> {
-    serde_json::to_string_pretty(schema)
-        .map_err(|error| SchemafyError::new(format!("failed to render schema: {error}")))
+pub fn render_schema(schema: &Value, pretty: bool) -> Result<String> {
+    if pretty {
+        serde_json::to_string_pretty(schema)
+            .map_err(|error| SchemafyError::new(format!("failed to render schema: {error}")))
+    } else {
+        serde_json::to_string(schema)
+            .map_err(|error| SchemafyError::new(format!("failed to render schema: {error}")))
+    }
 }
 
 pub fn types_help() -> &'static str {
@@ -185,7 +190,7 @@ Examples
 pub fn write_schema_to_temp_file(name: &str, schema: &Value) -> Result<PathBuf> {
     let temp_dir = create_unique_temp_dir()?;
     let output_path = temp_dir.join(format!("{}.json", sanitize_file_name(name)));
-    let rendered = render_schema(schema)?;
+    let rendered = render_schema(schema, true)?;
     fs::write(&output_path, format!("{rendered}\n"))?;
     Ok(output_path)
 }

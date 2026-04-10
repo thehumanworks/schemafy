@@ -38,6 +38,12 @@ struct GenerateArgs {
     raw: bool,
 
     #[arg(
+        long,
+        help = "Pretty print the JSON schema output. Only used in 'raw' mode."
+    )]
+    pretty: bool,
+
+    #[arg(
         long = "field",
         required = true,
         value_name = "NAME=TYPE",
@@ -75,7 +81,7 @@ fn run() -> schemafy::Result<()> {
         &fields,
     );
     if cli.generate.raw {
-        println!("{}", render_schema(&schema)?);
+        println!("{}", render_schema(&schema, cli.generate.pretty)?);
         return Ok(());
     }
 
