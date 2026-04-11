@@ -1,2 +1,4 @@
 /target
+/dist
 .Ds_Store
+npm/schemafy-*/bin/

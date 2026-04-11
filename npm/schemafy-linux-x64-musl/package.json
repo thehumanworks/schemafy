@@ -1,0 +1,23 @@
+{
+  "name": "@nothumanwork/schemafy-linux-x64-musl",
+  "version": "0.1.0",
+  "description": "Linux x64 (musl) binary for the schemafy CLI.",
+  "publishConfig": {
+    "access": "public"
+  },
+  "os": [
+    "linux"
+  ],
+  "cpu": [
+    "x64"
+  ],
+  "files": [
+    "bin/schemafy"
+  ],
+  "bin": {
+    "schemafy": "bin/schemafy"
+  },
+  "libc": [
+    "musl"
+  ]
+}

@@ -1,0 +1,41 @@
+{
+  "name": "@nothumanwork/schemafy",
+  "version": "0.1.0",
+  "description": "Cross-platform npm launcher for the schemafy CLI.",
+  "publishConfig": {
+    "access": "public"
+  },
+  "os": [
+    "darwin",
+    "linux",
+    "win32"
+  ],
+  "cpu": [
+    "arm64",
+    "x64"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "bin": {
+    "schemafy": "bin/schemafy.js"
+  },
+  "files": [
+    "bin",
+    "lib",
+    "scripts"
+  ],
+  "scripts": {
+    "postinstall": "node ./scripts/postinstall.js"
+  },
+  "optionalDependencies": {
+    "@nothumanwork/schemafy-darwin-arm64": "0.1.0",
+    "@nothumanwork/schemafy-darwin-x64": "0.1.0",
+    "@nothumanwork/schemafy-linux-arm64-gnu": "0.1.0",
+    "@nothumanwork/schemafy-linux-arm64-musl": "0.1.0",
+    "@nothumanwork/schemafy-linux-x64-gnu": "0.1.0",
+    "@nothumanwork/schemafy-linux-x64-musl": "0.1.0",
+    "@nothumanwork/schemafy-win32-arm64-msvc": "0.1.0",
+    "@nothumanwork/schemafy-win32-x64-msvc": "0.1.0"
+  }
+}

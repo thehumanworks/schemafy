@@ -1,0 +1,17 @@
+{
+  "name": "schemafy-workspace",
+  "version": "0.0.0",
+  "private": true,
+  "workspaces": [
+    "npm/schemafy",
+    "npm/schemafy-*"
+  ],
+  "scripts": {
+    "npm:sync": "node ./scripts/prepare-npm-packages.js",
+    "npm:stage": "node ./scripts/prepare-npm-packages.js --artifacts-dir ./dist/npm",
+    "npm:publish": "node ./scripts/publish-npm-packages.js",
+    "npm:publish:dry-run": "node ./scripts/publish-npm-packages.js --dry-run",
+    "prepublishOnly": "node ./scripts/refuse-root-publish.js",
+    "test:npm": "node --test npm/schemafy/test/*.test.js"
+  }
+}

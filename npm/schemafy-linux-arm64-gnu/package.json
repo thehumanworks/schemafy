@@ -1,0 +1,23 @@
+{
+  "name": "@nothumanwork/schemafy-linux-arm64-gnu",
+  "version": "0.1.0",
+  "description": "Linux arm64 (glibc) binary for the schemafy CLI.",
+  "publishConfig": {
+    "access": "public"
+  },
+  "os": [
+    "linux"
+  ],
+  "cpu": [
+    "arm64"
+  ],
+  "files": [
+    "bin/schemafy"
+  ],
+  "bin": {
+    "schemafy": "bin/schemafy"
+  },
+  "libc": [
+    "glibc"
+  ]
+}
