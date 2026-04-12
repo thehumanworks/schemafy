@@ -251,6 +251,14 @@ function parseCliArgs(argv, env = process.env) {
     publishOptions.artifactsDir = path.resolve(repoRoot, env.SCHEMAFY_NPM_ARTIFACTS_DIR);
   }
 
+  if (
+    !publishOptions.githubRunId &&
+    npmArgs.length > 0 &&
+    /^\d+$/.test(npmArgs[0])
+  ) {
+    [publishOptions.githubRunId] = npmArgs.splice(0, 1);
+  }
+
   return { npmArgs, publishOptions };
 }
 

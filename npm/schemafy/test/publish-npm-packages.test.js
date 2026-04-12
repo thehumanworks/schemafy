@@ -7,6 +7,7 @@ const test = require('node:test');
 const { githubArtifactSubpath, TARGETS } = require('../lib/targets.js');
 const {
   PUBLISH_WORKSPACES,
+  parseCliArgs,
   preparePublishablePackages,
   verifyPublishablePackages,
 } = require('../../../scripts/publish-npm-packages.js');
@@ -14,6 +15,27 @@ const {
 test('publishes platform packages before the launcher package', () => {
   assert.equal(PUBLISH_WORKSPACES.length, TARGETS.length + 1);
   assert.equal(PUBLISH_WORKSPACES.at(-1), 'npm/schemafy');
+});
+
+test('parses an explicit GitHub run id flag', () => {
+  const { npmArgs, publishOptions } = parseCliArgs([
+    '--github-run-id',
+    '24308698750',
+    '--dry-run',
+  ]);
+
+  assert.deepEqual(npmArgs, ['--dry-run']);
+  assert.equal(publishOptions.githubRunId, '24308698750');
+});
+
+test('treats a leading bare numeric arg as the GitHub run id', () => {
+  const { npmArgs, publishOptions } = parseCliArgs([
+    '24308698750',
+    '--dry-run',
+  ]);
+
+  assert.deepEqual(npmArgs, ['--dry-run']);
+  assert.equal(publishOptions.githubRunId, '24308698750');
 });
 
 test('reports missing staged platform binaries before publish', () => {

@@ -45,7 +45,7 @@ jobs:
             bin: schemafy.exe
             run_tests: false
           - target: x86_64-apple-darwin
-            os: macos-13
+            os: macos-15-intel
             bin: schemafy
             run_tests: true
           - target: aarch64-apple-darwin
@@ -53,7 +53,7 @@ jobs:
             bin: schemafy
             run_tests: true
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -78,7 +78,7 @@ jobs:
         run: cargo build --release --target ${{ matrix.target }}
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: schemafy-${{ matrix.target }}
           path: target/${{ matrix.target }}/release/${{ matrix.bin }}
