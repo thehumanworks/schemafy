@@ -4,7 +4,7 @@ const os = require('node:os');
 const path = require('node:path');
 const test = require('node:test');
 
-const { getTargetForHost, resolveBinary } = require('../lib/targets.js');
+const { bundledBinarySubpath, getTargetForHost, resolveBinary } = require('../lib/targets.js');
 
 test('maps linux musl hosts to the musl package', () => {
   const target = getTargetForHost({
@@ -13,7 +13,7 @@ test('maps linux musl hosts to the musl package', () => {
     libc: 'musl',
   });
 
-  assert.equal(target?.packageName, '@nothumanwork/schemafy-linux-x64-musl');
+  assert.equal(target?.rustTarget, 'x86_64-unknown-linux-musl');
 });
 
 test('returns undefined for unsupported platforms', () => {
@@ -26,26 +26,19 @@ test('returns undefined for unsupported platforms', () => {
   );
 });
 
-test('resolves an installed optional dependency binary', () => {
+test('resolves a bundled package binary', () => {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'schemafy-npm-'));
 
   try {
     const packageRoot = path.join(tempRoot, 'npm', 'schemafy');
     const libDir = path.join(packageRoot, 'lib');
-    const dependencyDir = path.join(
-      packageRoot,
-      'node_modules',
-      '@nothumanwork',
-      'schemafy-linux-x64-gnu',
-    );
-    const binaryPath = path.join(dependencyDir, 'bin', 'schemafy');
+    const binaryPath = path.join(packageRoot, bundledBinarySubpath({
+      rustTarget: 'x86_64-unknown-linux-gnu',
+      binaryName: 'schemafy',
+    }));
 
     fs.mkdirSync(libDir, { recursive: true });
     fs.mkdirSync(path.dirname(binaryPath), { recursive: true });
-    fs.writeFileSync(
-      path.join(dependencyDir, 'package.json'),
-      '{"name":"@nothumanwork/schemafy-linux-x64-gnu"}\n',
-    );
     fs.writeFileSync(binaryPath, '#!/bin/sh\nexit 0\n');
 
     const resolution = resolveBinary({
@@ -58,7 +51,7 @@ test('resolves an installed optional dependency binary', () => {
       includeLocalBuilds: false,
     });
 
-    assert.equal(resolution.source, 'optionalDependency');
+    assert.equal(resolution.source, 'bundledPackage');
     assert.equal(fs.realpathSync(resolution.binaryPath), fs.realpathSync(binaryPath));
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });

@@ -3,8 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "workspaces": [
-    "npm/schemafy",
-    "npm/schemafy-*"
+    "npm/schemafy"
   ],
   "scripts": {
     "npm:sync": "node ./scripts/prepare-npm-packages.js",

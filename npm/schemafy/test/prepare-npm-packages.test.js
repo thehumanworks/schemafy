@@ -4,21 +4,23 @@ const os = require('node:os');
 const path = require('node:path');
 const test = require('node:test');
 
-const { binarySubpath, githubArtifactSubpath, TARGETS } = require('../lib/targets.js');
+const { bundledBinarySubpath, githubArtifactSubpath, TARGETS } = require('../lib/targets.js');
 const {
-  createPlatformManifest,
   createRootManifest,
   stageBinaries,
 } = require('../../../scripts/prepare-npm-packages.js');
 
-test('generates publish-safe bin paths', () => {
+test('generates publish-safe bundled bin paths', () => {
   const rootManifest = createRootManifest('1.2.3');
   assert.equal(rootManifest.bin.schemafy, 'bin/schemafy.js');
+  assert.equal(rootManifest.optionalDependencies, undefined);
 
   for (const target of TARGETS) {
-    const manifest = createPlatformManifest('1.2.3', target);
-    assert.equal(manifest.bin.schemafy, binarySubpath(target));
-    assert.equal(manifest.bin.schemafy.startsWith('./'), false);
+    const subpath = bundledBinarySubpath(target);
+    assert.equal(subpath.startsWith('bin/'), true);
+    assert.equal(subpath.endsWith(`/${target.binaryName}`), true);
+    assert.equal(subpath.includes(`/${target.rustTarget}/`), true);
+    assert.equal(subpath.startsWith('./'), false);
   }
 });
 
@@ -39,9 +41,8 @@ test('stages binaries from a GitHub Actions artifact download layout', () => {
       const destinationPath = path.join(
         tempRoot,
         'npm',
-        target.packageDirectoryName,
-        'bin',
-        target.binaryName,
+        'schemafy',
+        bundledBinarySubpath(target),
       );
       assert.equal(fs.readFileSync(destinationPath, 'utf8'), target.binaryName);
     }
@@ -71,9 +72,8 @@ test('stages binaries from a flattened GitHub artifact download layout', () => {
       const destinationPath = path.join(
         tempRoot,
         'npm',
-        target.packageDirectoryName,
-        'bin',
-        target.binaryName,
+        'schemafy',
+        bundledBinarySubpath(target),
       );
       assert.equal(fs.readFileSync(destinationPath, 'utf8'), target.binaryName);
     }

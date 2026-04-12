@@ -6,8 +6,8 @@ const {
   ROOT_PACKAGE_NAME,
   TARGETS,
   artifactSubpath,
+  bundledBinarySubpath,
   githubArtifactName,
-  binarySubpath,
   githubArtifactSubpath,
 } = require('../npm/schemafy/lib/targets.js');
 
@@ -20,13 +20,6 @@ function main() {
     path.join(repoRoot, 'npm', 'schemafy', 'package.json'),
     createRootManifest(version),
   );
-
-  for (const target of TARGETS) {
-    writeJson(
-      path.join(repoRoot, 'npm', target.packageDirectoryName, 'package.json'),
-      createPlatformManifest(version, target),
-    );
-  }
 
   const artifactsDir = resolveArtifactsDir();
   if (artifactsDir) {
@@ -87,33 +80,7 @@ function createRootManifest(version) {
     scripts: {
       postinstall: 'node ./scripts/postinstall.js',
     },
-    optionalDependencies: Object.fromEntries(
-      TARGETS.map((target) => [target.packageName, version]),
-    ),
   };
-}
-
-function createPlatformManifest(version, target) {
-  const manifest = {
-    name: target.packageName,
-    version,
-    description: `${target.displayName} binary for the schemafy CLI.`,
-    publishConfig: {
-      access: 'public',
-    },
-    os: [target.os],
-    cpu: [target.cpu],
-    files: [binarySubpath(target)],
-    bin: {
-      schemafy: binarySubpath(target),
-    },
-  };
-
-  if (target.libc) {
-    manifest.libc = [target.libc];
-  }
-
-  return manifest;
 }
 
 function stageBinaries(artifactsDir, rootDir = repoRoot) {
@@ -122,7 +89,7 @@ function stageBinaries(artifactsDir, rootDir = repoRoot) {
   for (const target of TARGETS) {
     const sourcePath = resolveArtifactSourcePath(artifactsDir, target);
     if (!fs.existsSync(sourcePath)) {
-      missingArtifacts.push(`${target.packageName}: ${sourcePath}`);
+      missingArtifacts.push(`${target.rustTarget}: ${sourcePath}`);
     }
   }
 
@@ -137,9 +104,8 @@ function stageBinaries(artifactsDir, rootDir = repoRoot) {
     const destinationPath = path.join(
       rootDir,
       'npm',
-      target.packageDirectoryName,
-      'bin',
-      target.binaryName,
+      'schemafy',
+      bundledBinarySubpath(target),
     );
 
     fs.mkdirSync(path.dirname(destinationPath), { recursive: true });
@@ -176,7 +142,6 @@ if (require.main === module) {
 }
 
 module.exports = {
-  createPlatformManifest,
   createRootManifest,
   main,
   readCargoVersion,

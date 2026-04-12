@@ -7,6 +7,7 @@ const { execFileSync, spawnSync } = require('node:child_process');
 const {
   ROOT_PACKAGE_NAME,
   TARGETS,
+  bundledBinarySubpath,
   githubArtifactName,
 } = require('../npm/schemafy/lib/targets.js');
 const { stageBinaries } = require('./prepare-npm-packages.js');
@@ -14,22 +15,18 @@ const { stageBinaries } = require('./prepare-npm-packages.js');
 const repoRoot = path.resolve(__dirname, '..');
 const ROOT_WORKSPACE = 'npm/schemafy';
 const DEFAULT_GITHUB_WORKFLOW = 'build.yml';
-const PUBLISH_WORKSPACES = [
-  ...TARGETS.map((target) => path.posix.join('npm', target.packageDirectoryName)),
-  ROOT_WORKSPACE,
-];
+const PUBLISH_WORKSPACES = [ROOT_WORKSPACE];
 
 function getMissingBinaries(rootDir = repoRoot) {
   return TARGETS.flatMap((target) => {
     const binaryPath = path.join(
       rootDir,
       'npm',
-      target.packageDirectoryName,
-      'bin',
-      target.binaryName,
+      'schemafy',
+      bundledBinarySubpath(target),
     );
 
-    return fs.existsSync(binaryPath) ? [] : [`${target.packageName}: ${binaryPath}`];
+    return fs.existsSync(binaryPath) ? [] : [`${target.rustTarget}: ${binaryPath}`];
   });
 }
 

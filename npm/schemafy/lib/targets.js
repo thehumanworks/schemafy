@@ -8,8 +8,6 @@ const ROOT_PACKAGE_NAME = `${SCOPE}/schemafy`;
 const TARGETS = [
   {
     id: 'darwin-arm64',
-    packageDirectoryName: 'schemafy-darwin-arm64',
-    packageName: `${SCOPE}/schemafy-darwin-arm64`,
     rustTarget: 'aarch64-apple-darwin',
     os: 'darwin',
     cpu: 'arm64',
@@ -18,8 +16,6 @@ const TARGETS = [
   },
   {
     id: 'darwin-x64',
-    packageDirectoryName: 'schemafy-darwin-x64',
-    packageName: `${SCOPE}/schemafy-darwin-x64`,
     rustTarget: 'x86_64-apple-darwin',
     os: 'darwin',
     cpu: 'x64',
@@ -28,8 +24,6 @@ const TARGETS = [
   },
   {
     id: 'linux-arm64-gnu',
-    packageDirectoryName: 'schemafy-linux-arm64-gnu',
-    packageName: `${SCOPE}/schemafy-linux-arm64-gnu`,
     rustTarget: 'aarch64-unknown-linux-gnu',
     os: 'linux',
     cpu: 'arm64',
@@ -39,8 +33,6 @@ const TARGETS = [
   },
   {
     id: 'linux-arm64-musl',
-    packageDirectoryName: 'schemafy-linux-arm64-musl',
-    packageName: `${SCOPE}/schemafy-linux-arm64-musl`,
     rustTarget: 'aarch64-unknown-linux-musl',
     os: 'linux',
     cpu: 'arm64',
@@ -50,8 +42,6 @@ const TARGETS = [
   },
   {
     id: 'linux-x64-gnu',
-    packageDirectoryName: 'schemafy-linux-x64-gnu',
-    packageName: `${SCOPE}/schemafy-linux-x64-gnu`,
     rustTarget: 'x86_64-unknown-linux-gnu',
     os: 'linux',
     cpu: 'x64',
@@ -61,8 +51,6 @@ const TARGETS = [
   },
   {
     id: 'linux-x64-musl',
-    packageDirectoryName: 'schemafy-linux-x64-musl',
-    packageName: `${SCOPE}/schemafy-linux-x64-musl`,
     rustTarget: 'x86_64-unknown-linux-musl',
     os: 'linux',
     cpu: 'x64',
@@ -72,8 +60,6 @@ const TARGETS = [
   },
   {
     id: 'win32-arm64-msvc',
-    packageDirectoryName: 'schemafy-win32-arm64-msvc',
-    packageName: `${SCOPE}/schemafy-win32-arm64-msvc`,
     rustTarget: 'aarch64-pc-windows-msvc',
     os: 'win32',
     cpu: 'arm64',
@@ -82,8 +68,6 @@ const TARGETS = [
   },
   {
     id: 'win32-x64-msvc',
-    packageDirectoryName: 'schemafy-win32-x64-msvc',
-    packageName: `${SCOPE}/schemafy-win32-x64-msvc`,
     rustTarget: 'x86_64-pc-windows-msvc',
     os: 'win32',
     cpu: 'x64',
@@ -167,6 +151,10 @@ function binarySubpath(target) {
   return path.posix.join('bin', target.binaryName);
 }
 
+function bundledBinarySubpath(target) {
+  return path.posix.join('bin', target.rustTarget, target.binaryName);
+}
+
 function artifactSubpath(target) {
   return path.join(target.rustTarget, target.binaryName);
 }
@@ -217,19 +205,15 @@ function resolveBinary(options = {}) {
   }
 
   const packageRoot = path.resolve(baseDir, '..');
-  const dependencySpecifier = `${target.packageName}/${binarySubpath(target)}`;
-
-  try {
-    const binaryPath = require.resolve(dependencySpecifier, { paths: [packageRoot] });
+  const bundledBinaryPath = path.join(packageRoot, bundledBinarySubpath(target));
+  if (fs.existsSync(bundledBinaryPath)) {
     return {
       host,
       target,
-      binaryPath,
+      binaryPath: bundledBinaryPath,
       checkedPaths,
-      source: 'optionalDependency',
+      source: 'bundledPackage',
     };
-  } catch {
-    // Fall through to the local build lookup.
   }
 
   if (includeLocalBuilds) {
@@ -274,7 +258,7 @@ function formatMissingBinaryError(resolution) {
   if (!resolution.target) {
     const supportedTargets = TARGETS.map((target) => {
       const libcSuffix = target.libc ? `/${target.libc}` : '';
-      return `  - ${target.os}/${target.cpu}${libcSuffix} -> ${target.packageName}`;
+      return `  - ${target.os}/${target.cpu}${libcSuffix} -> ${target.rustTarget}`;
     }).join('\n');
 
     return [
@@ -285,9 +269,9 @@ function formatMissingBinaryError(resolution) {
   }
 
   const lines = [
-    `${ROOT_PACKAGE_NAME} could not find a binary for ${formatHost(resolution.host)}.`,
-    `Expected optional dependency: ${resolution.target.packageName}.`,
-    'If you installed from npm, make sure optional dependencies are enabled.',
+    `${ROOT_PACKAGE_NAME} could not find a bundled binary for ${formatHost(resolution.host)}.`,
+    `Expected bundled path: ${bundledBinarySubpath(resolution.target)}.`,
+    'If you installed from npm, reinstall the package or clear the npm cache and try again.',
     'If you are running from a checkout, build the Rust CLI first with `cargo build`.',
   ];
 
@@ -306,6 +290,7 @@ module.exports = {
   TARGETS,
   artifactSubpath,
   binarySubpath,
+  bundledBinarySubpath,
   detectHost,
   detectLibc,
   formatMissingBinaryError,

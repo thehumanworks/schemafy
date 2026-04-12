@@ -4,17 +4,17 @@ const os = require('node:os');
 const path = require('node:path');
 const test = require('node:test');
 
-const { githubArtifactSubpath, TARGETS } = require('../lib/targets.js');
+const { bundledBinarySubpath, githubArtifactSubpath, TARGETS } = require('../lib/targets.js');
 const {
   PUBLISH_WORKSPACES,
   parseCliArgs,
   preparePublishablePackages,
+  publishPackages,
   verifyPublishablePackages,
 } = require('../../../scripts/publish-npm-packages.js');
 
-test('publishes platform packages before the launcher package', () => {
-  assert.equal(PUBLISH_WORKSPACES.length, TARGETS.length + 1);
-  assert.equal(PUBLISH_WORKSPACES.at(-1), 'npm/schemafy');
+test('publishes only the launcher package workspace', () => {
+  assert.deepEqual(PUBLISH_WORKSPACES, ['npm/schemafy']);
 });
 
 test('parses an explicit GitHub run id flag', () => {
@@ -38,7 +38,7 @@ test('treats a leading bare numeric arg as the GitHub run id', () => {
   assert.equal(publishOptions.githubRunId, '24308698750');
 });
 
-test('reports missing staged platform binaries before publish', () => {
+test('reports missing bundled binaries before publish', () => {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'schemafy-publish-'));
 
   try {
@@ -67,9 +67,8 @@ test('accepts a fully staged publish layout', () => {
       const binaryPath = path.join(
         tempRoot,
         'npm',
-        target.packageDirectoryName,
-        'bin',
-        target.binaryName,
+        'schemafy',
+        bundledBinarySubpath(target),
       );
       fs.mkdirSync(path.dirname(binaryPath), { recursive: true });
       fs.writeFileSync(binaryPath, '');
@@ -93,7 +92,7 @@ test('hydrates missing staged binaries from a GitHub artifact directory', () => 
     for (const target of TARGETS) {
       const artifactPath = path.join(artifactsDir, githubArtifactSubpath(target));
       fs.mkdirSync(path.dirname(artifactPath), { recursive: true });
-      fs.writeFileSync(artifactPath, target.packageName);
+      fs.writeFileSync(artifactPath, target.rustTarget);
     }
 
     assert.doesNotThrow(() =>
@@ -109,11 +108,10 @@ test('hydrates missing staged binaries from a GitHub artifact directory', () => 
       const binaryPath = path.join(
         tempRoot,
         'npm',
-        target.packageDirectoryName,
-        'bin',
-        target.binaryName,
+        'schemafy',
+        bundledBinarySubpath(target),
       );
-      assert.equal(fs.readFileSync(binaryPath, 'utf8'), target.packageName);
+      assert.equal(fs.readFileSync(binaryPath, 'utf8'), target.rustTarget);
     }
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
@@ -149,7 +147,7 @@ test('downloads missing staged binaries from GitHub artifacts for the current co
         for (const target of TARGETS) {
           const artifactPath = path.join(outputDir, githubArtifactSubpath(target));
           fs.mkdirSync(path.dirname(artifactPath), { recursive: true });
-          fs.writeFileSync(artifactPath, target.packageName);
+          fs.writeFileSync(artifactPath, target.rustTarget);
         }
         return '';
       }
@@ -179,12 +177,51 @@ test('downloads missing staged binaries from GitHub artifacts for the current co
       const binaryPath = path.join(
         tempRoot,
         'npm',
-        target.packageDirectoryName,
-        'bin',
-        target.binaryName,
+        'schemafy',
+        bundledBinarySubpath(target),
       );
-      assert.equal(fs.readFileSync(binaryPath, 'utf8'), target.packageName);
+      assert.equal(fs.readFileSync(binaryPath, 'utf8'), target.rustTarget);
     }
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test('publishes the root npm workspace only once', () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'schemafy-publish-'));
+  const calls = [];
+
+  try {
+    const launcherPath = path.join(tempRoot, 'npm', 'schemafy', 'bin', 'schemafy.js');
+    fs.mkdirSync(path.dirname(launcherPath), { recursive: true });
+    fs.writeFileSync(launcherPath, '#!/usr/bin/env node\n');
+
+    for (const target of TARGETS) {
+      const binaryPath = path.join(
+        tempRoot,
+        'npm',
+        'schemafy',
+        bundledBinarySubpath(target),
+      );
+      fs.mkdirSync(path.dirname(binaryPath), { recursive: true });
+      fs.writeFileSync(binaryPath, '');
+    }
+
+    publishPackages(
+      ['--dry-run'],
+      tempRoot,
+      {},
+      {
+        spawnSync: (command, args) => {
+          calls.push([command, args]);
+          return { status: 0 };
+        },
+      },
+    );
+
+    assert.deepEqual(calls, [
+      ['npm', ['publish', '--workspace', 'npm/schemafy', '--dry-run']],
+    ]);
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }
