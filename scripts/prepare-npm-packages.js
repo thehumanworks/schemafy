@@ -7,6 +7,7 @@ const {
   TARGETS,
   artifactSubpath,
   binarySubpath,
+  githubArtifactSubpath,
 } = require('../npm/schemafy/lib/targets.js');
 
 const repoRoot = path.resolve(__dirname, '..');
@@ -114,11 +115,11 @@ function createPlatformManifest(version, target) {
   return manifest;
 }
 
-function stageBinaries(artifactsDir) {
+function stageBinaries(artifactsDir, rootDir = repoRoot) {
   const missingArtifacts = [];
 
   for (const target of TARGETS) {
-    const sourcePath = path.join(artifactsDir, artifactSubpath(target));
+    const sourcePath = resolveArtifactSourcePath(artifactsDir, target);
     if (!fs.existsSync(sourcePath)) {
       missingArtifacts.push(`${target.packageName}: ${sourcePath}`);
     }
@@ -131,9 +132,9 @@ function stageBinaries(artifactsDir) {
   }
 
   for (const target of TARGETS) {
-    const sourcePath = path.join(artifactsDir, artifactSubpath(target));
+    const sourcePath = resolveArtifactSourcePath(artifactsDir, target);
     const destinationPath = path.join(
-      repoRoot,
+      rootDir,
       'npm',
       target.packageDirectoryName,
       'bin',
@@ -146,6 +147,15 @@ function stageBinaries(artifactsDir) {
       fs.chmodSync(destinationPath, 0o755);
     }
   }
+}
+
+function resolveArtifactSourcePath(artifactsDir, target) {
+  const localArtifactPath = path.join(artifactsDir, artifactSubpath(target));
+  if (fs.existsSync(localArtifactPath)) {
+    return localArtifactPath;
+  }
+
+  return path.join(artifactsDir, githubArtifactSubpath(target));
 }
 
 function writeJson(filePath, value) {
@@ -162,6 +172,7 @@ module.exports = {
   createRootManifest,
   main,
   readCargoVersion,
+  resolveArtifactSourcePath,
   resolveArtifactsDir,
   stageBinaries,
   writeJson,

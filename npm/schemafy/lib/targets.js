@@ -171,6 +171,20 @@ function artifactSubpath(target) {
   return path.join(target.rustTarget, target.binaryName);
 }
 
+function githubArtifactName(target) {
+  return `schemafy-${target.rustTarget}`;
+}
+
+function githubArtifactSubpath(target) {
+  return path.join(
+    githubArtifactName(target),
+    'target',
+    target.rustTarget,
+    'release',
+    target.binaryName,
+  );
+}
+
 function getTargetForHost(host = detectHost()) {
   return TARGETS.find((target) => {
     if (target.os !== host.platform || target.cpu !== host.arch) {
@@ -296,5 +310,7 @@ module.exports = {
   detectLibc,
   formatMissingBinaryError,
   getTargetForHost,
+  githubArtifactName,
+  githubArtifactSubpath,
   resolveBinary,
 };
