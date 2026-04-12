@@ -49,3 +49,35 @@ test('stages binaries from a GitHub Actions artifact download layout', () => {
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }
 });
+
+test('stages binaries from a flattened GitHub artifact download layout', () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'schemafy-stage-'));
+  const artifactsDir = path.join(tempRoot, 'artifacts');
+
+  try {
+    for (const target of TARGETS) {
+      const sourcePath = path.join(
+        artifactsDir,
+        `schemafy-${target.rustTarget}`,
+        target.binaryName,
+      );
+      fs.mkdirSync(path.dirname(sourcePath), { recursive: true });
+      fs.writeFileSync(sourcePath, target.binaryName);
+    }
+
+    stageBinaries(artifactsDir, tempRoot);
+
+    for (const target of TARGETS) {
+      const destinationPath = path.join(
+        tempRoot,
+        'npm',
+        target.packageDirectoryName,
+        'bin',
+        target.binaryName,
+      );
+      assert.equal(fs.readFileSync(destinationPath, 'utf8'), target.binaryName);
+    }
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});

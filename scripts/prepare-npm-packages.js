@@ -6,6 +6,7 @@ const {
   ROOT_PACKAGE_NAME,
   TARGETS,
   artifactSubpath,
+  githubArtifactName,
   binarySubpath,
   githubArtifactSubpath,
 } = require('../npm/schemafy/lib/targets.js');
@@ -150,12 +151,19 @@ function stageBinaries(artifactsDir, rootDir = repoRoot) {
 }
 
 function resolveArtifactSourcePath(artifactsDir, target) {
-  const localArtifactPath = path.join(artifactsDir, artifactSubpath(target));
-  if (fs.existsSync(localArtifactPath)) {
-    return localArtifactPath;
+  const candidatePaths = [
+    path.join(artifactsDir, artifactSubpath(target)),
+    path.join(artifactsDir, githubArtifactName(target), target.binaryName),
+    path.join(artifactsDir, githubArtifactSubpath(target)),
+  ];
+
+  for (const candidatePath of candidatePaths) {
+    if (fs.existsSync(candidatePath)) {
+      return candidatePath;
+    }
   }
 
-  return path.join(artifactsDir, githubArtifactSubpath(target));
+  return candidatePaths.at(-1);
 }
 
 function writeJson(filePath, value) {
