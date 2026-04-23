@@ -41,6 +41,15 @@ Write the schema to a temp file and print the path:
   --field 'attendees=array<{name:string,email:string?}>'
 ```
 
+Generate a string enum:
+
+```bash
+./schemafy/target/release/schemafy \
+  --raw \
+  --name Review \
+  --field 'confidence="low"|"medium"|"high"'
+```
+
 ## Type DSL
 
 - `string`, `str`
@@ -52,6 +61,7 @@ Write the schema to a temp file and print the path:
 - `T[]` or `array<T>` for arrays
 - `{field:type,...}` or `object{field:type,...}` for explicit nested objects
 - `A|B` for field-level unions
+- `"a"|"b"|"c"` for string enums
 - `{TYPE:-value}` for shell-style field defaults
 
 Examples:
@@ -61,6 +71,7 @@ Examples:
 - `tags=string[]`
 - `address={city:string,zip:int}`
 - `value=string|int`
+- `confidence="low"|"medium"|"high"`
 - `name={string:-codex}`
 - `retries={int:-3}`
 - `enabled={bool:-true}`
@@ -69,6 +80,7 @@ Examples:
 
 - The generated root schema is always a strict object with every field in `required`.
 - Nullable fields are represented as unions with `null`.
+- Pure unions of string literals are emitted as JSON Schema string enums.
 - Field defaults are emitted as JSON Schema `default`.
 - Generated objects always set `additionalProperties: false`.
 - Arbitrary free-form object maps are intentionally not supported because OpenAI Structured Outputs requires explicit object keys in strict schemas.
