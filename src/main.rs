@@ -47,7 +47,7 @@ struct GenerateArgs {
         long = "field",
         required = true,
         value_name = "NAME=TYPE",
-        help = "Add a field like name=string, age=int?, or address={city:string,zip:int}."
+        help = "Add a field like name=string, age=int?, confidence=\"low\"|\"medium\"|\"high\", or address={city:string,zip:int}."
     )]
     fields: Vec<String>,
 }

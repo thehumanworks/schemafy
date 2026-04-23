@@ -18,6 +18,7 @@ pub struct Field {
 #[derive(Debug, Clone, PartialEq)]
 pub enum TypeExpr {
     Primitive(PrimitiveType),
+    Enum(Vec<String>),
     Array(Box<TypeExpr>),
     Object(Vec<Field>),
     Union(Vec<TypeExpr>),
@@ -83,13 +84,54 @@ impl TypeExpr {
             ),
             Self::Union(members) => {
                 let mut normalized = Vec::new();
+                let mut enum_values = Vec::new();
+                let mut first_enum_index = None;
+
                 for member in members.into_iter().map(Self::normalized) {
                     match member {
-                        Self::Union(nested) => normalized.extend(nested),
+                        Self::Union(nested) => {
+                            for nested_member in nested {
+                                match nested_member {
+                                    Self::Enum(values) => {
+                                        if first_enum_index.is_none() {
+                                            first_enum_index = Some(normalized.len());
+                                        }
+                                        for value in values {
+                                            if !enum_values
+                                                .iter()
+                                                .any(|existing| existing == &value)
+                                            {
+                                                enum_values.push(value);
+                                            }
+                                        }
+                                    }
+                                    other => normalized.push(other),
+                                }
+                            }
+                        }
+                        Self::Enum(values) => {
+                            if first_enum_index.is_none() {
+                                first_enum_index = Some(normalized.len());
+                            }
+                            for value in values {
+                                if !enum_values.iter().any(|existing| existing == &value) {
+                                    enum_values.push(value);
+                                }
+                            }
+                        }
                         other => normalized.push(other),
                     }
                 }
-                Self::Union(normalized)
+
+                if !enum_values.is_empty() {
+                    normalized.insert(first_enum_index.unwrap_or(0), Self::Enum(enum_values));
+                }
+
+                if normalized.len() == 1 {
+                    normalized.pop().unwrap()
+                } else {
+                    Self::Union(normalized)
+                }
             }
             primitive => primitive,
         }
@@ -163,6 +205,9 @@ Containers
   A|B                  Field-level union via anyOf
   T?                   Nullable T (same as T|null)
 
+Enums
+  "a"|"b"|"c"          String enum via JSON Schema enum
+
 Defaults
   Use shell-style defaults on a field with:
     --field 'name={string:-codex}'
@@ -182,6 +227,7 @@ Config
 
 Examples
   schemafy --raw --name Person --field 'name=string' --field 'age=int?'
+  schemafy --raw --name Review --field 'confidence="low"|"medium"|"high"'
   schemafy --name Config --field 'name={string:-codex}'
   schemafy --field 'user={name:string,email:string?}' --name User
 "#
@@ -242,24 +288,42 @@ fn split_default_wrapper(input: &str) -> (&str, Option<&str>) {
     let mut brace_depth = 0usize;
     let mut angle_depth = 0usize;
     let mut square_depth = 0usize;
+    let mut string_delimiter = None;
+    let mut escaped = false;
     let chars: Vec<(usize, char)> = inner.char_indices().collect();
     let mut index = 0usize;
 
     while index < chars.len() {
         let (offset, ch) = chars[index];
+
+        if let Some(delimiter) = string_delimiter {
+            if escaped {
+                escaped = false;
+            } else if ch == '\\' {
+                escaped = true;
+            } else if ch == delimiter {
+                string_delimiter = None;
+            }
+            index += 1;
+            continue;
+        }
+
         match ch {
+            '"' | '\'' => string_delimiter = Some(ch),
             '{' => brace_depth += 1,
             '}' => brace_depth = brace_depth.saturating_sub(1),
             '<' => angle_depth += 1,
             '>' => angle_depth = angle_depth.saturating_sub(1),
             '[' => square_depth += 1,
             ']' => square_depth = square_depth.saturating_sub(1),
-            ':' if brace_depth == 0 && angle_depth == 0 && square_depth == 0 => {
-                if chars.get(index + 1).map(|(_, next)| *next) == Some('-') {
-                    let ty = inner[..offset].trim();
-                    let default = inner[offset + 2..].trim();
-                    return (ty, Some(default));
-                }
+            ':' if brace_depth == 0
+                && angle_depth == 0
+                && square_depth == 0
+                && chars.get(index + 1).map(|(_, next)| *next) == Some('-') =>
+            {
+                let ty = inner[..offset].trim();
+                let default = inner[offset + 2..].trim();
+                return (ty, Some(default));
             }
             _ => {}
         }
@@ -282,6 +346,13 @@ fn try_parse_default_value(ty: &TypeExpr, source: &str) -> Option<Value> {
     match ty {
         TypeExpr::Primitive(PrimitiveType::String) => {
             Some(Value::String(parse_string_default(source)))
+        }
+        TypeExpr::Enum(members) => {
+            let value = parse_string_default(source);
+            members
+                .iter()
+                .any(|member| member == &value)
+                .then_some(Value::String(value))
         }
         TypeExpr::Primitive(PrimitiveType::Integer) => source.parse::<i64>().ok().map(Value::from),
         TypeExpr::Primitive(PrimitiveType::Number) => source
@@ -313,7 +384,7 @@ fn try_parse_default_value(ty: &TypeExpr, source: &str) -> Option<Value> {
             }
 
             for member in members {
-                if *member != TypeExpr::Primitive(PrimitiveType::String)
+                if !is_string_like(member)
                     && let Some(value) = try_parse_default_value(member, source)
                 {
                     return Some(value);
@@ -321,7 +392,7 @@ fn try_parse_default_value(ty: &TypeExpr, source: &str) -> Option<Value> {
             }
 
             for member in members {
-                if *member == TypeExpr::Primitive(PrimitiveType::String)
+                if is_string_like(member)
                     && let Some(value) = try_parse_default_value(member, source)
                 {
                     return Some(value);
@@ -331,6 +402,13 @@ fn try_parse_default_value(ty: &TypeExpr, source: &str) -> Option<Value> {
             None
         }
     }
+}
+
+fn is_string_like(ty: &TypeExpr) -> bool {
+    matches!(
+        ty,
+        TypeExpr::Primitive(PrimitiveType::String) | TypeExpr::Enum(_)
+    )
 }
 
 fn parse_string_default(source: &str) -> String {
@@ -347,6 +425,9 @@ fn parse_string_default(source: &str) -> String {
 fn value_matches_type(ty: &TypeExpr, value: &Value) -> bool {
     match ty {
         TypeExpr::Primitive(PrimitiveType::String) => value.is_string(),
+        TypeExpr::Enum(members) => value
+            .as_str()
+            .is_some_and(|entry| members.iter().any(|member| member == entry)),
         TypeExpr::Primitive(PrimitiveType::Integer) => value.as_i64().is_some(),
         TypeExpr::Primitive(PrimitiveType::Number) => value.as_f64().is_some(),
         TypeExpr::Primitive(PrimitiveType::Boolean) => value.is_boolean(),
@@ -371,6 +452,11 @@ fn value_matches_type(ty: &TypeExpr, value: &Value) -> bool {
 fn describe_type(ty: &TypeExpr) -> String {
     match ty {
         TypeExpr::Primitive(primitive) => primitive.json_type().to_string(),
+        TypeExpr::Enum(members) => members
+            .iter()
+            .map(|member| serde_json::to_string(member).unwrap_or_else(|_| format!("\"{member}\"")))
+            .collect::<Vec<_>>()
+            .join("|"),
         TypeExpr::Array(item) => format!("array<{}>", describe_type(item)),
         TypeExpr::Object(fields) => format!(
             "object{{{}}}",
@@ -418,6 +504,21 @@ fn type_schema(ty: &TypeExpr, default: Option<&Value>) -> Value {
         TypeExpr::Primitive(primitive) => {
             let mut schema = Map::new();
             schema.insert("type".into(), Value::String(primitive.json_type().into()));
+            schema
+        }
+        TypeExpr::Enum(members) => {
+            let mut schema = Map::new();
+            schema.insert("type".into(), Value::String("string".into()));
+            schema.insert(
+                "enum".into(),
+                Value::Array(
+                    members
+                        .iter()
+                        .cloned()
+                        .map(Value::String)
+                        .collect::<Vec<_>>(),
+                ),
+            );
             schema
         }
         TypeExpr::Array(item) => {
@@ -545,6 +646,10 @@ impl<'a> Parser<'a> {
             return self.parse_object_body();
         }
 
+        if self.peek_char() == Some('"') {
+            return Ok(TypeExpr::Enum(vec![self.parse_string_literal()?]));
+        }
+
         let identifier = self
             .parse_identifier()
             .ok_or_else(|| self.error("expected a type"))?;
@@ -573,6 +678,33 @@ impl<'a> Parser<'a> {
             "null" => Ok(TypeExpr::Primitive(PrimitiveType::Null)),
             other => Err(self.error(format!("unknown type '{other}'"))),
         }
+    }
+
+    fn parse_string_literal(&mut self) -> Result<String> {
+        self.skip_ws();
+        let start = self.offset;
+        self.expect_char('"', "expected a string literal")?;
+
+        let mut escaped = false;
+        while let Some(char) = self.peek_char() {
+            self.bump_char();
+            if escaped {
+                escaped = false;
+                continue;
+            }
+
+            match char {
+                '\\' => escaped = true,
+                '"' => {
+                    let literal = &self.input[start..self.offset];
+                    return serde_json::from_str::<String>(literal)
+                        .map_err(|error| self.error(format!("invalid string literal: {error}")));
+                }
+                _ => {}
+            }
+        }
+
+        Err(self.error("unterminated string literal"))
     }
 
     fn parse_object_body(&mut self) -> Result<TypeExpr> {
